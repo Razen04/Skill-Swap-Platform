@@ -10,8 +10,8 @@ const Register = ({ switchToLogin }) => {
         password: '',
         name: '',
         photo: null,
-        skillsOffered: '',
-        skillsWanted: '',
+        skills_offered: '',
+        skills_wanted: '',
         location: false,
         availability: '',
     });
@@ -36,10 +36,16 @@ const Register = ({ switchToLogin }) => {
         e.preventDefault();
         // submit form here
 
-        const formData = new formData();
-        Object.entries(form).forEach(([key, value]) => {
-            formData.append(key, value);
-        })
+        const formData = new FormData();
+        // Ensure correct keys are sent to backend
+        formData.append('email', form.email);
+        formData.append('password', form.password);
+        formData.append('name', form.name);
+        formData.append('photo', form.photo);
+        formData.append('skills_offered', form.skills_offered);
+        formData.append('skills_wanted', form.skills_wanted);
+        formData.append('location', form.location);
+        formData.append('availability', form.availability);
 
         try {
             const res = await fetch("http://localhost:5000/register", {
@@ -49,7 +55,11 @@ const Register = ({ switchToLogin }) => {
 
             const data = await res.json();
             console.log(data);
-            // Optional: Redirect to homepage or show toast
+            if (res.ok) {
+                // Redirect to login page after successful registration
+                switchToLogin();
+            }
+            // Optionally: show toast or error if needed
         } catch (err) {
             console.error("Registration error:", err);
         }
@@ -159,28 +169,28 @@ const Register = ({ switchToLogin }) => {
 
                             <div className="relative">
                                 <FaTools className="absolute left-4 top-1/2 transform -translate-y-1/2 text-violet-400" />
-                                <input
-                                    type="text"
-                                    name="skillsOffered"
-                                    placeholder="Skills You Offer"
-                                    value={form.skillsOffered}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full pl-12 pr-4 py-3 border border-violet-300 rounded-lg focus:outline-none focus:border-violet-500 transition"
-                                />
+                            <input
+                                type="text"
+                                name="skills_offered"
+                                placeholder="Skills You Offer"
+                                value={form.skills_offered}
+                                onChange={handleChange}
+                                required
+                                className="w-full pl-12 pr-4 py-3 border border-violet-300 rounded-lg focus:outline-none focus:border-violet-500 transition"
+                            />
                             </div>
 
                             <div className="relative">
                                 <FaTools className="absolute left-4 top-1/2 transform -translate-y-1/2 text-violet-400" />
-                                <input
-                                    type="text"
-                                    name="skillsWanted"
-                                    placeholder="Skills You Want"
-                                    value={form.skillsWanted}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full pl-12 pr-4 py-3 border border-violet-300 rounded-lg focus:outline-none focus:border-violet-500 transition"
-                                />
+                            <input
+                                type="text"
+                                name="skills_wanted"
+                                placeholder="Skills You Want"
+                                value={form.skills_wanted}
+                                onChange={handleChange}
+                                required
+                                className="w-full pl-12 pr-4 py-3 border border-violet-300 rounded-lg focus:outline-none focus:border-violet-500 transition"
+                            />
                             </div>
 
                             <label className="flex items-center gap-2">

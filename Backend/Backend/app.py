@@ -3,6 +3,7 @@ from flask_cors import CORS
 import bcrypt
 
 from database.database import db, User  
+from database.database import SwapRequest  # Import SwapRequest model
 
 
 app = Flask(__name__)
@@ -97,7 +98,6 @@ def get_users():
                 'skills_offered': skills_offered,
                 'skills_wanted': skills_wanted,
                 'profile_photo_url': user.profile_photo_url,
-                'is_public': user.is_public,
                 'is_banned': user.is_banned,
             })
 
@@ -131,10 +131,6 @@ def update_profile():
             user.skills_offered = data['skills_offered']
         if 'skills_wanted' in data:
             user.skills_wanted = data['skills_wanted']
-
-        # Public/private switch
-        if 'is_public' in data:
-            user.is_public = data['is_public'].lower() == 'true'
 
         db.session.commit()
 
@@ -181,5 +177,197 @@ def view_profile():
         print("❌ View profile error:", e)
         return jsonify({'status': 'fail', 'message': 'Something went wrong'}), 500
     
+@app.route('/send-request', methods=['POST'])
+def send_request():
+    try:
+        if 'user_id' not in session:
+            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
+
+        data = request.get_json()
+        sender_id = session['user_id']
+        receiver_id = data.get('receiver_id')
+        print(receiver_id)
+        message = data.get('message', '')
+
+        if not receiver_id:
+            return jsonify({'status': 'fail', 'message': 'Receiver ID is required'}), 400
+        if receiver_id == sender_id:
+            return jsonify({'status': 'fail', 'message': 'You cannot request yourself'}), 400
+
+        swap = SwapRequest(
+            sender_id=sender_id,
+            receiver_id=receiver_id,
+            skill_offered=data.get('skill_offered', ''),
+            skill_requested=data.get('skill_requested', ''),
+            message=message
+        )
+        db.session.add(swap)
+        db.session.commit()
+
+        return jsonify({'status': 'ok', 'message': 'Swap request sent successfully'})
+
+    except Exception as e:
+        print("❌ Send request error:", e)
+        return jsonify({'status': 'fail', 'message': 'Something went wrong'}), 500
+    
+
+@app.route('/incoming-requests', methods=['GET'])
+def incoming_requests():
+    try:
+        if 'user_id' not in session:
+            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
+
+        user_id = session['user_id']
+
+        requests = SwapRequest.query.filter_by(receiver_id=user_id).order_by(SwapRequest.created_at.desc()).all()
+
+        request_list = []
+        for req in requests:
+            sender = User.query.get(req.sender_id)
+            request_list.append({
+                'request_id': req.id,
+                'sender_id': sender.user_id,
+                'sender_name': sender.name,
+                'sender_email': sender.email,
+                'skill_offered': req.skill_offered,
+                'skill_requested': req.skill_requested,
+                'message': req.message,
+                'status': req.status,
+                'sent_at': req.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+
+        return jsonify({'status': 'ok', 'requests': request_list})
+
+    except Exception as e:
+        print("❌ Error fetching incoming requests:", e)
+        return jsonify({'status': 'fail', 'message': 'Something went wrong'}), 500
+
+@app.route('/sent-requests', methods=['GET'])
+def sent_requests():
+    try:
+        if 'user_id' not in session:
+            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
+
+        user_id = session['user_id']
+
+        sent = SwapRequest.query.filter_by(sender_id=user_id).order_by(SwapRequest.created_at.desc()).all()
+
+        request_list = []
+        for req in sent:
+            receiver = User.query.get(req.receiver_id)
+
+            request_info = {
+                'request_id': req.id,
+                'receiver_id': receiver.user_id,
+                'receiver_name': receiver.name,
+                'skill_offered': req.skill_offered,
+                'skill_requested': req.skill_requested,
+                'message': req.message,
+                'status': req.status,
+                'sent_at': req.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            }
+
+            # If accepted, add receiver's email for contact
+            if req.status == 'accepted':
+                request_info['receiver_email'] = receiver.email
+
+            request_list.append(request_info)
+
+        return jsonify({'status': 'ok', 'sent_requests': request_list})
+
+    except Exception as e:
+        print("❌ Sent requests error:", e)
+        return jsonify({'status': 'fail', 'message': 'Something went wrong'}), 500
+
+@app.route('/accept-request/<int:request_id>', methods=['POST'])
+def accept_request(request_id):
+    try:
+        if 'user_id' not in session:
+            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
+
+        swap = SwapRequest.query.get(request_id)
+
+        if not swap or swap.receiver_id != session['user_id']:
+            return jsonify({'status': 'fail', 'message': 'Invalid or unauthorized request'}), 403
+
+        if swap.status != 'pending':
+            return jsonify({'status': 'fail', 'message': 'Request already processed'}), 400
+
+        swap.status = 'accepted'
+        db.session.commit()
+
+        sender = User.query.get(swap.sender_id)
+
+        return jsonify({
+            'status': 'ok',
+            'message': 'Request accepted',
+            'sender_name': sender.name,
+            'sender_email': sender.email
+        })
+
+    except Exception as e:
+        print("❌ Accept request error:", e)
+        return jsonify({'status': 'fail', 'message': 'Something went wrong'}), 500
+
+@app.route('/decline-request/<int:request_id>', methods=['POST'])
+def decline_request(request_id):
+    try:
+        if 'user_id' not in session:
+            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
+
+        swap = SwapRequest.query.get(request_id)
+
+        if not swap or swap.receiver_id != session['user_id']:
+            return jsonify({'status': 'fail', 'message': 'Invalid or unauthorized request'}), 403
+
+        if swap.status != 'pending':
+            return jsonify({'status': 'fail', 'message': 'Request already processed'}), 400
+
+        swap.status = 'rejected'
+        db.session.commit()
+
+        return jsonify({'status': 'ok', 'message': 'Request declined'})
+
+    except Exception as e:
+        print("❌ Decline request error:", e)
+        return jsonify({'status': 'fail', 'message': 'Something went wrong'}), 500
+
+@app.route('/feedback/<int:request_id>', methods=['POST'])
+def give_feedback(request_id):
+    try:
+        if 'user_id' not in session:
+            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
+
+        data = request.get_json()
+        feedback_text = data.get('feedback', '').strip()
+        rating = data.get('rating')
+
+        if not feedback_text or not (1 <= int(rating) <= 5):
+            return jsonify({'status': 'fail', 'message': 'Feedback and rating (1–5) are required'}), 400
+
+        swap = SwapRequest.query.get(request_id)
+
+        if not swap:
+            return jsonify({'status': 'fail', 'message': 'Request not found'}), 404
+
+        # Ensure only sender or receiver can give feedback
+        if session['user_id'] not in [swap.sender_id, swap.receiver_id]:
+            return jsonify({'status': 'fail', 'message': 'You are not authorized for this feedback'}), 403
+
+        # Only allow feedback on accepted swaps
+        if swap.status != 'accepted':
+            return jsonify({'status': 'fail', 'message': 'Feedback allowed only for accepted requests'}), 400
+
+        swap.feedback = feedback_text
+        swap.rating = int(rating)
+
+        db.session.commit()
+
+        return jsonify({'status': 'ok', 'message': 'Feedback submitted successfully'})
+
+    except Exception as e:
+        print("❌ Feedback error:", e)
+        return jsonify({'status': 'fail', 'message': 'Something went wrong'}), 500
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True)

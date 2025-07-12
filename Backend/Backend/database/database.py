@@ -22,3 +22,19 @@ class User(db.Model):
 
     def __repr__(self):
         return f'<User {self.name}>'
+    
+
+# in models.py or wherever your model is defined
+class SwapRequest(db.Model):
+    __tablename__ = 'swap_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    skill_offered = db.Column(db.String(100), nullable=False)
+    skill_requested = db.Column(db.String(100), nullable=False)
+    message = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')  # pending, accepted, rejected
+    feedback = db.Column(db.Text)  # optional
+    rating = db.Column(db.Integer)  # optional: out of 5
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaEnvelope, FaLock } from 'react-icons/fa';
 import { MdSwapHoriz } from 'react-icons/md';
 import Register from './Register';
+import { loginUser } from '../api/auth';
 
-const Login = () => {
+const Login = ({ setIsLoggedIn }) => {
     const [showRegister, setShowRegister] = useState(false);
     const [loginEmail, setLoginEmail] = useState("");
     const [loginPassword, setLoginPassword] = useState("");
+    const navigate = useNavigate();
 
     if (showRegister) return <Register switchToLogin={() => setShowRegister(false)} />;
 
@@ -19,14 +22,14 @@ const Login = () => {
         formData.append("password", loginPassword);
 
         try {
-            const res = await fetch("http://localhost:5000/login", {
-                method: "POST",
-                body: formData,
-            });
-
-            const data = await res.json();
-            console.log(data);
-            // Optional: Redirect or set localStorage
+            const data = await loginUser(formData);
+            setIsLoggedIn(true);
+            console.log(data)
+            if (data && data.status === 'ok') {
+                navigate('/home');
+            } else {
+                alert(data?.message || "Login failed");
+            }
         } catch (err) {
             console.error("Login error:", err);
         }
