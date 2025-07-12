@@ -13,8 +13,10 @@ class User(db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     location = db.Column(db.String(100))
     profile_photo_url = db.Column(db.String(255))
+    skills_offered = db.Column(db.Text)  # store as comma-separated string
+    skills_wanted = db.Column(db.Text)
     availability = db.Column(db.String(50))
-    is_public = db.Column(db.Boolean, default=True)
+    role = db.Column(db.String(50), default='user')  # e.g., 'user', 'admin'
     is_banned = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
